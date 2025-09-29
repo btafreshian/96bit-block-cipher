@@ -18,6 +18,17 @@ target_include_directories(cube96 PUBLIC include)
 
 target_compile_features(cube96 PUBLIC cxx_std_17)
 
+set(CUBE96_LAYOUT "zslice" CACHE STRING "State layout mapping (zslice|rowmajor)")
+set_property(CACHE CUBE96_LAYOUT PROPERTY STRINGS zslice rowmajor)
+
+if(CUBE96_LAYOUT STREQUAL "rowmajor")
+  target_compile_definitions(cube96 PUBLIC CUBE96_LAYOUT_ROWMAJOR)
+elseif(CUBE96_LAYOUT STREQUAL "zslice")
+  target_compile_definitions(cube96 PUBLIC CUBE96_LAYOUT_ZSLICE)
+else()
+  message(FATAL_ERROR "Unknown CUBE96_LAYOUT='${CUBE96_LAYOUT}'. Use 'zslice' or 'rowmajor'.")
+endif()
+
 add_executable(cube96_cli tools/cube96_cli.cpp)
 target_link_libraries(cube96_cli PRIVATE cube96)
 
@@ -29,6 +40,7 @@ set(TEST_SOURCES
   tests/test_vectors.cpp
   tests/test_permutation.cpp
   tests/test_kdf.cpp
+  tests/test_kdf_deterministic.cpp
   tests/test_avalanche.cpp)
 
 include(CTest)
