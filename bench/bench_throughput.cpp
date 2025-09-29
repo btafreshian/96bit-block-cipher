@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <random>
@@ -47,7 +48,18 @@ void run_bench(cube96::CubeCipher::Impl impl, std::size_t bytes) {
 } // namespace
 
 int main() {
-  const std::size_t bytes = 64ull * 1024ull * 1024ull;
+  std::size_t bytes = 64ull * 1024ull * 1024ull;
+  if (const char *env = std::getenv("CUBE96_BENCH_BYTES")) {
+    char *end = nullptr;
+    std::uint64_t parsed = std::strtoull(env, &end, 0);
+    if (end != env && parsed >= cube96::CubeCipher::BlockBytes) {
+      bytes = static_cast<std::size_t>(parsed -
+                                       (parsed % cube96::CubeCipher::BlockBytes));
+      if (bytes == 0) {
+        bytes = cube96::CubeCipher::BlockBytes;
+      }
+    }
+  }
   run_bench(cube96::CubeCipher::Impl::Fast, bytes);
   run_bench(cube96::CubeCipher::Impl::Hardened, bytes);
   return 0;
