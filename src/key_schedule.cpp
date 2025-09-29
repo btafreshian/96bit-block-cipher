@@ -226,12 +226,15 @@ void hkdf_expand(const std::uint8_t prk[32], const std::uint8_t *info,
 }
 
 DerivedMaterial derive_material(const std::uint8_t key[kKeyBytes]) {
+  // HKDF salt encodes ASCII "StagedCube's-96-HKDF-V1" padded to 32 bytes with
+  // zeros. The fixed salt and info string guarantee deterministic derivation
+  // across platforms.
   static const std::uint8_t kSalt[32] = {
       0x53, 0x74, 0x61, 0x67, 0x65, 0x64, 0x43, 0x75,
       0x62, 0x65, 0x27, 0x73, 0x2D, 0x39, 0x36, 0x2D,
       0x48, 0x4B, 0x44, 0x46, 0x2D, 0x56, 0x31, 0x00,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  static const std::uint8_t kInfo[] = "Cube96-RK-PS-Post-v1";
+  static const std::uint8_t kInfo[] = "Cube96-RK-PS-Post-v1"; // ASCII, no NUL
 
   std::uint8_t prk[32];
   hmac_sha256(kSalt, sizeof(kSalt), key, kKeyBytes, prk);

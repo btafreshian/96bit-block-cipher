@@ -1,16 +1,27 @@
 # Cube96 Block Cipher
 
+[![CI](https://github.com/OWNER/96bit-block-cipher/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/96bit-block-cipher/actions/workflows/ci.yml)
+
 Cube96 is a 96-bit block cipher implementation with both fast and constant-time
 execution paths. The design operates on a 4×4×6 logical cube of bits and pairs
 AES S-box substitution with key-dependent Rubik-style permutations derived from
 SplitMix64. Keys and permutations are deterministically produced with an
 HKDF(SHA-256) schedule.
 
+> **Security disclaimer:** This cipher is experimental and not suitable for
+> production deployments.
+
+For technical details, round descriptions, and the full permutation catalogue
+refer to [`docs/spec.md`](docs/spec.md).
+
 ## Features
 
 - 96-bit block and key size with eight rounds plus post-whitening
 - Two interchangeable implementations: table-driven fast path and bitsliced
   constant-time hardened path
+- Compile-time selectable state layout. The default `zslice` layout stores two
+  bytes per z-slice, while the optional `rowmajor` layout stores contiguous rows
+  for improved cache behaviour on some platforms.
 - HKDF-based key schedule with built-in SHA-256, HMAC, and SplitMix64 PRNG
 - Deterministic per-round permutation generation from 36 documented primitives
 - Static library (`libcube96`), CLI demo, throughput benchmark, and unit tests
@@ -25,6 +36,11 @@ cd build
 cmake ..
 cmake --build .
 ```
+
+To explicitly select a layout mapping at configure time, pass
+`-DCUBE96_LAYOUT=zslice` (default) or `-DCUBE96_LAYOUT=rowmajor` to the CMake
+configure command. The chosen layout affects how `(x, y, z)` cube coordinates
+map to bytes/bits in memory.
 
 ## Testing
 
@@ -58,6 +74,25 @@ encrypting 64 MiB of random data in ECB mode. After building, run:
 ```sh
 ./cube96_bench
 ```
+
+Set the `CUBE96_BENCH_BYTES` environment variable to reduce the workload during
+CI runs or quick smoke tests (default is 64 MiB).
+
+## Analysis Helpers
+
+Lightweight tooling for exploratory cryptanalysis is provided under
+[`analysis/`](analysis/).
+
+- `python3 analysis/ddt_lat.py` computes the AES S-box difference distribution
+  and linear approximation tables and writes CSV files next to the script.
+- `python3 analysis/diff_trails.py --rounds 4 --branch 4` performs a simple
+  branch-and-bound differential trail search (configurable depth/branching) and
+  reports the best probability found.
+- `python3 analysis/linear_bias.py --rounds 4 --samples 200000` estimates linear
+  correlations by Monte Carlo sampling.
+
+The scripts emit human-readable summaries and/or CSV outputs suitable for
+further inspection in spreadsheets or plotting tools.
 
 ## Project Layout
 
