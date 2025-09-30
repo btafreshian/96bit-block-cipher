@@ -93,8 +93,9 @@ Each entry specifies a 96-bit key, plaintext, and ciphertext in hexadecimal.
 For example, `kat2_increment` can be reproduced with the CLI:
 
 ```sh
-./cube96_cli enc 000102030405060708090a0b 0c0d0e0f1011121314151617
-# -> 07e1e8afe74f1ffaf327549a
+$ ./cube96_cli enc 000102030405060708090a0b 0c0d0e0f1011121314151617
+Research cipher — NOT FOR PRODUCTION. Key size chosen for tractability, not security.
+07e1e8afe74f1ffaf327549a
 ```
 
 ## Benchmark
