@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include <array>
 #include <cctype>
 #include <iostream>
@@ -7,6 +9,15 @@
 
 namespace {
 
+constexpr char kWarning[] =
+    "Research cipher — NOT FOR PRODUCTION. Key size chosen for tractability, not "
+    "security.";
+
+constexpr int kExitSuccess = 0;
+constexpr int kExitUsage = 64;
+constexpr int kExitHexError = 65;
+constexpr int kExitModeError = 66;
+
 int hex_value(char c) {
   if (c >= '0' && c <= '9') return c - '0';
   if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
@@ -14,8 +25,8 @@ int hex_value(char c) {
   return -1;
 }
 
-bool parse_hex(const std::string &hex,
-               std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> &out) {
+template <std::size_t N>
+bool parse_hex(const std::string &hex, std::array<std::uint8_t, N> &out) {
   if (hex.size() != out.size() * 2) {
     return false;
   }
@@ -30,6 +41,17 @@ bool parse_hex(const std::string &hex,
   return true;
 }
 
+template <std::size_t N>
+bool parse_hex_argument(const std::string &hex, const char *label,
+                        std::array<std::uint8_t, N> &out) {
+  if (!parse_hex(hex, out)) {
+    std::cerr << "Invalid " << label << " (expected " << (out.size() * 2)
+              << " hex characters)." << '\n';
+    return false;
+  }
+  return true;
+}
+
 void print_hex(const std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> &data) {
   static const char *digits = "0123456789abcdef";
   for (auto b : data) {
@@ -38,21 +60,38 @@ void print_hex(const std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> &d
   std::cout << '\n';
 }
 
+int print_usage(const char *prog_name) {
+  std::cerr << "Usage: " << prog_name
+            << " <enc|dec> <hex-key-24> <hex-data-24>" << '\n';
+  return kExitUsage;
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
+  std::cerr << kWarning << '\n';
+
   if (argc != 4) {
-    std::cerr << "Usage: cube96 <enc|dec> <hex-key-24> <hex-data-24>\n";
-    return 1;
+    return print_usage(argv[0]);
   }
 
   std::string mode = argv[1];
   std::array<std::uint8_t, cube96::CubeCipher::KeyBytes> key{};
   std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> input{};
 
-  if (!parse_hex(argv[2], key) || !parse_hex(argv[3], input)) {
-    std::cerr << "Invalid hex input (expected 24 hex characters).\n";
-    return 1;
+  if (!parse_hex_argument(argv[2], "key", key)) {
+    return kExitHexError;
+  }
+
+  if (mode != "enc" && mode != "dec") {
+    std::cerr << "Unknown mode: " << mode << '\n';
+    print_usage(argv[0]);
+    return kExitModeError;
+  }
+
+  const char *data_label = mode == "enc" ? "plaintext" : "ciphertext";
+  if (!parse_hex_argument(argv[3], data_label, input)) {
+    return kExitHexError;
   }
 
   cube96::CubeCipher cipher;
@@ -64,11 +103,8 @@ int main(int argc, char **argv) {
     cipher.encryptBlock(input.data(), output.data());
   } else if (mode == "dec") {
     cipher.decryptBlock(input.data(), output.data());
-  } else {
-    std::cerr << "Unknown mode: " << mode << '\n';
-    return 1;
   }
 
   print_hex(output);
-  return 0;
+  return kExitSuccess;
 }

@@ -55,6 +55,10 @@ ctest
 The CLI encrypts or decrypts a single 96-bit block encoded as 24 hexadecimal
 characters.
 
+Every invocation prints a reminder that this is an experimental artifact:
+
+> Research cipher — NOT FOR PRODUCTION. Key size chosen for tractability, not security.
+
 ```sh
 ./cube96_cli enc <hex-key-24> <hex-plaintext-24>
 ./cube96_cli dec <hex-key-24> <hex-ciphertext-24>
@@ -64,6 +68,31 @@ Example:
 
 ```sh
 ./cube96_cli enc 000102030405060708090a0b 0c0d0e0f1011121314151617
+```
+
+Exit codes:
+
+- `0` – success
+- `64` – incorrect CLI usage (missing/extra arguments)
+- `65` – malformed key/plaintext/ciphertext hex input
+- `66` – unknown mode (expected `enc` or `dec`)
+
+## Reference Test Vectors
+
+Deterministic known-answer tests for the default `zslice` layout are recorded in
+[`vectors/cube96_kats.csv`](vectors/cube96_kats.csv). Regenerate them with the
+`cube96_gen_kats` helper built alongside the CLI and benchmark:
+
+```sh
+./cube96_gen_kats vectors/cube96_kats.csv
+```
+
+Each entry specifies a 96-bit key, plaintext, and ciphertext in hexadecimal.
+For example, `kat2_increment` can be reproduced with the CLI:
+
+```sh
+./cube96_cli enc 000102030405060708090a0b 0c0d0e0f1011121314151617
+# -> 07e1e8afe74f1ffaf327549a
 ```
 
 ## Benchmark
@@ -93,6 +122,19 @@ Lightweight tooling for exploratory cryptanalysis is provided under
 
 The scripts emit human-readable summaries and/or CSV outputs suitable for
 further inspection in spreadsheets or plotting tools.
+
+## Interoperability Notes
+
+- Cube96 operates on 96-bit keys and blocks. All interfaces therefore expect
+  exactly 24 hexadecimal characters per key or block with no `0x` prefix or
+  separators.
+- Hexadecimal input is interpreted in big-endian byte order (the first two hex
+  characters correspond to the most significant byte). Upper- and lowercase hex
+  digits are accepted.
+- The CLI and provided vectors target the default `CUBE96_LAYOUT=zslice`
+  configuration. Switching to the optional `rowmajor` layout preserves the
+  ciphertexts but integrators who introduce additional compile-time changes
+  should regenerate vectors to capture their configuration.
 
 ## Project Layout
 

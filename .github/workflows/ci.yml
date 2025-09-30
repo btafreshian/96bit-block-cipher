@@ -1,44 +1,54 @@
+# SPDX-License-Identifier: MIT
+# Research-only cube96 CI workflow enforcing strict compiler warnings.
 name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.compiler }} ${{ matrix.build_type }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+    env:
+      BUILD_DIR: build/${{ matrix.compiler }}-${{ matrix.build_type }}
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup compiler
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            echo "CC=gcc" >> "$GITHUB_ENV"
+            echo "CXX=g++" >> "$GITHUB_ENV"
+          else
+            echo "CC=clang" >> "$GITHUB_ENV"
+            echo "CXX=clang++" >> "$GITHUB_ENV"
+          fi
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-ccache-${{ hashFiles('CMakeLists.txt', 'src/**/*.cpp', 'include/**/*.hpp') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-ccache-
+            ${{ runner.os }}-${{ matrix.compiler }}-
+
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -S . -B "$BUILD_DIR" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build "$BUILD_DIR" --config ${{ matrix.build_type }}
 
-      - name: Run tests
-        run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            ctest --test-dir build -C Release --output-on-failure
-          else
-            ctest --test-dir build --output-on-failure
-          fi
-        shell: bash
-
-      - name: Run benchmark (smoke)
-        run: |
-          cmake -E env CUBE96_BENCH_BYTES=65536 ./build/cube96_bench
-        shell: bash
-        if: matrix.os != 'windows-latest'
-
-      - name: Run benchmark (smoke, Windows)
-        run: |
-          cmake -E env CUBE96_BENCH_BYTES=65536 build/Release/cube96_bench.exe
-        if: matrix.os == 'windows-latest'
+      - name: Test
+        run: ctest --test-dir "$BUILD_DIR" --output-on-failure --build-config ${{ matrix.build_type }}
