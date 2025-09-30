@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 cmake_minimum_required(VERSION 3.12)
 project(cube96 LANGUAGES CXX)
 
