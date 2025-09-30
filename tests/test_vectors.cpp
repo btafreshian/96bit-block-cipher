@@ -1,40 +1,136 @@
 #include <array>
+#include <cctype>
+#include <fstream>
 #include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "cube96/cipher.hpp"
 
 namespace {
 
+template <std::size_t N>
+bool parse_hex(const std::string &hex, std::array<std::uint8_t, N> &out) {
+  if (hex.size() != N * 2) {
+    return false;
+  }
+  for (std::size_t i = 0; i < N; ++i) {
+    auto hex_value = [](char c) -> int {
+      if (c >= '0' && c <= '9') return c - '0';
+      if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
+      if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
+      return -1;
+    };
+    int hi = hex_value(hex[2 * i]);
+    int lo = hex_value(hex[2 * i + 1]);
+    if (hi < 0 || lo < 0) {
+      return false;
+    }
+    out[i] = static_cast<std::uint8_t>((hi << 4) | lo);
+  }
+  return true;
+}
+
 struct Vector {
-  std::array<std::uint8_t, cube96::CubeCipher::KeyBytes> key;
-  std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> plain;
-  std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> expect;
+  std::array<std::uint8_t, cube96::CubeCipher::KeyBytes> key{};
+  std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> plain{};
+  std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> cipher{};
 };
 
 } // namespace
 
 int main() {
-  static const std::array<Vector, 3> vectors = {{
-      Vector{{{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
-             {{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
-             {{0xB6, 0x39, 0x3A, 0xE0, 0xD2, 0xE9, 0xA2, 0xC7, 0x71, 0xE6, 0x19, 0xFA}}},
-      Vector{{{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
-             {{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
-             {{0x99, 0xF0, 0xC3, 0xE4, 0x2E, 0xAE, 0xCF, 0xE6, 0x2B, 0x19, 0xD0, 0x93}}},
-      Vector{{{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B}},
-             {{0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17}},
-             {{0x07, 0xE1, 0xE8, 0xAF, 0xE7, 0x4F, 0x1F, 0xFA, 0xF3, 0x27, 0x54, 0x9A}}},
-  }};
+#if defined(CUBE96_LAYOUT_ROWMAJOR)
+  const std::string kat_path = std::string(CUBE96_PROJECT_ROOT) +
+                               "/vectors/cube96_kats_rowmajor.csv";
+#else
+  const std::string kat_path = std::string(CUBE96_PROJECT_ROOT) +
+                               "/vectors/cube96_kats_zslice.csv";
+#endif
 
-  cube96::CubeCipher cipher;
-  for (std::size_t i = 0; i < vectors.size(); ++i) {
-    const auto &vec = vectors[i];
-    cipher.setKey(vec.key.data());
-    std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> out{};
-    cipher.encryptBlock(vec.plain.data(), out.data());
-    if (out != vec.expect) {
-      std::cerr << "Vector " << i << " mismatch\n";
+  std::ifstream kat_file(kat_path);
+  if (!kat_file) {
+    std::cerr << "Unable to open KAT file: " << kat_path << "\n";
+    return 1;
+  }
+
+  std::string line;
+  if (!std::getline(kat_file, line)) {
+    std::cerr << "KAT file is empty: " << kat_path << "\n";
+    return 1;
+  }
+
+  std::vector<Vector> vectors;
+  while (std::getline(kat_file, line)) {
+    if (line.empty()) {
+      continue;
+    }
+    std::stringstream ss(line);
+    std::string key_hex;
+    std::string plain_hex;
+    std::string cipher_hex;
+    if (!std::getline(ss, key_hex, ',')) {
+      continue;
+    }
+    if (!std::getline(ss, plain_hex, ',')) {
+      continue;
+    }
+    if (!std::getline(ss, cipher_hex, ',')) {
+      continue;
+    }
+    Vector vec;
+    if (!parse_hex(key_hex, vec.key)) {
+      std::cerr << "Invalid key hex in KAT: " << key_hex << "\n";
       return 1;
+    }
+    if (!parse_hex(plain_hex, vec.plain)) {
+      std::cerr << "Invalid plaintext hex in KAT: " << plain_hex << "\n";
+      return 1;
+    }
+    if (!parse_hex(cipher_hex, vec.cipher)) {
+      std::cerr << "Invalid ciphertext hex in KAT: " << cipher_hex << "\n";
+      return 1;
+    }
+    vectors.push_back(vec);
+  }
+
+  if (vectors.empty()) {
+    std::cerr << "No KAT entries found in " << kat_path << "\n";
+    return 1;
+  }
+
+  std::vector<cube96::CubeCipher::Impl> implementations;
+  if (cube96::CubeCipher::hasFastImpl()) {
+    implementations.push_back(cube96::CubeCipher::Impl::Fast);
+  }
+  if (cube96::CubeCipher::hasHardenedImpl()) {
+    implementations.push_back(cube96::CubeCipher::Impl::Hardened);
+  }
+
+  if (implementations.empty()) {
+    std::cerr << "No cipher implementations available for testing\n";
+    return 1;
+  }
+
+  for (const auto &vec : vectors) {
+    for (auto impl : implementations) {
+      cube96::CubeCipher cipher(impl);
+      cipher.setKey(vec.key.data());
+      std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> out{};
+      cipher.encryptBlock(vec.plain.data(), out.data());
+      if (out != vec.cipher) {
+        std::cerr << "Ciphertext mismatch for implementation "
+                  << static_cast<int>(impl) << "\n";
+        return 1;
+      }
+      std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> recovered{};
+      cipher.decryptBlock(vec.cipher.data(), recovered.data());
+      if (recovered != vec.plain) {
+        std::cerr << "Decrypt mismatch for implementation "
+                  << static_cast<int>(impl) << "\n";
+        return 1;
+      }
     }
   }
 

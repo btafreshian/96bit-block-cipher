@@ -30,7 +30,7 @@ void flip_bit(std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> &data,
 } // namespace
 
 int main() {
-  cube96::CubeCipher cipher(cube96::CubeCipher::Impl::Fast);
+  cube96::CubeCipher cipher(cube96::CubeCipher::DefaultImpl);
   std::array<std::uint8_t, cube96::CubeCipher::KeyBytes> key{};
   for (std::size_t i = 0; i < key.size(); ++i) {
     key[i] = static_cast<std::uint8_t>(0xAA ^ static_cast<std::uint8_t>(i * 7u));

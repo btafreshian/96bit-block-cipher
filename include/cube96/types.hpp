@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include <array>
@@ -10,6 +12,9 @@ constexpr std::size_t kBlockBytes = 12;   // 96 bits
 constexpr std::size_t kKeyBytes   = 12;   // 96 bits
 constexpr std::size_t kRoundCount = 8;
 constexpr std::size_t kPermSize   = 96;   // bits per block
+
+static_assert(kBlockBytes * 8 == 96, "Cube96 block size must be 96 bits");
+static_assert(kKeyBytes * 8 == 96, "Cube96 key size must be 96 bits");
 
 #if defined(CUBE96_LAYOUT_ROWMAJOR) && defined(CUBE96_LAYOUT_ZSLICE)
 #error "Only one of CUBE96_LAYOUT_ROWMAJOR or CUBE96_LAYOUT_ZSLICE may be defined"

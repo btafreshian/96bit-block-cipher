@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -56,24 +57,41 @@ int main() {
 
   std::size_t bytes = 64ull * 1024ull * 1024ull;
   if (const char *env = std::getenv("CUBE96_BENCH_BYTES")) {
+    if (*env == '\0') {
+      std::cerr << "CUBE96_BENCH_BYTES must not be empty." << '\n';
+      return EXIT_FAILURE;
+    }
     char *end = nullptr;
+    errno = 0;
     std::uint64_t parsed = std::strtoull(env, &end, 0);
-    if (end != env && *end == '\0' &&
-        parsed >= cube96::CubeCipher::BlockBytes) {
-      bytes = static_cast<std::size_t>(parsed -
-                                       (parsed % cube96::CubeCipher::BlockBytes));
-      if (bytes == 0) {
-        bytes = cube96::CubeCipher::BlockBytes;
-      }
-    } else if (end == env || *end != '\0') {
-      std::cerr << "Ignoring invalid CUBE96_BENCH_BYTES value '" << env
-                << "' (must be an integer number of bytes)." << '\n';
-    } else {
+    if (end == env || *end != '\0' || errno != 0) {
+      std::cerr << "CUBE96_BENCH_BYTES must be a valid integer number of bytes." << '\n';
+      return EXIT_FAILURE;
+    }
+    if (parsed < cube96::CubeCipher::BlockBytes) {
       std::cerr << "CUBE96_BENCH_BYTES must be at least "
                 << cube96::CubeCipher::BlockBytes << " bytes." << '\n';
+      return EXIT_FAILURE;
     }
+    if (parsed % cube96::CubeCipher::BlockBytes != 0) {
+      std::cerr << "CUBE96_BENCH_BYTES must be a multiple of "
+                << cube96::CubeCipher::BlockBytes << " bytes." << '\n';
+      return EXIT_FAILURE;
+    }
+    bytes = static_cast<std::size_t>(parsed);
   }
-  run_bench(cube96::CubeCipher::Impl::Fast, bytes);
-  run_bench(cube96::CubeCipher::Impl::Hardened, bytes);
-  return 0;
+  bool ran = false;
+  if (cube96::CubeCipher::hasFastImpl()) {
+    run_bench(cube96::CubeCipher::Impl::Fast, bytes);
+    ran = true;
+  }
+  if (cube96::CubeCipher::hasHardenedImpl()) {
+    run_bench(cube96::CubeCipher::Impl::Hardened, bytes);
+    ran = true;
+  }
+  if (!ran) {
+    std::cerr << "No cipher implementations enabled." << '\n';
+    return EXIT_FAILURE;
+  }
+  return EXIT_SUCCESS;
 }

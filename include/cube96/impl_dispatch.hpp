@@ -9,7 +9,8 @@
 namespace cube96 {
 
 // Fast: table-driven AES S-box, best for environments without timing
-// constraints on memory access.
+// constraints on memory access.  These entry points are omitted at link time
+// when the build defines CUBE96_DISABLE_FAST_IMPL.
 void sub_bytes_fast(std::uint8_t state[kBlockBytes]);
 void inv_sub_bytes_fast(std::uint8_t state[kBlockBytes]);
 

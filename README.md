@@ -2,14 +2,16 @@
 
 [![CI](https://github.com/OWNER/96bit-block-cipher/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/96bit-block-cipher/actions/workflows/ci.yml)
 
+> ⚠️ **Research cipher — NOT FOR PRODUCTION.** The 96-bit parameters keep the
+> state space tractable for exploration and are not intended to meet modern
+> security targets. ECB mode usage is limited to performance measurement; any
+> CTR experiments must use unique nonces and stay well below 2³² blocks of data.
+
 Cube96 is a 96-bit block cipher implementation with both fast and constant-time
 execution paths. The design operates on a 4×4×6 logical cube of bits and pairs
 AES S-box substitution with key-dependent Rubik-style permutations derived from
 SplitMix64. Keys and permutations are deterministically produced with an
 HKDF(SHA-256) schedule.
-
-> **Security disclaimer:** This cipher is experimental and not suitable for
-> production deployments.
 
 For technical details, round descriptions, and the full permutation catalogue
 refer to [`docs/spec.md`](docs/spec.md).
@@ -18,36 +20,81 @@ refer to [`docs/spec.md`](docs/spec.md).
 
 - 96-bit block and key size with eight rounds plus post-whitening
 - Two interchangeable implementations: table-driven fast path and bitsliced
-  constant-time hardened path
+  constant-time hardened path, selectable at runtime with build-time policy
 - Compile-time selectable state layout. The default `zslice` layout stores two
   bytes per z-slice, while the optional `rowmajor` layout stores contiguous rows
   for improved cache behaviour on some platforms.
 - HKDF-based key schedule with built-in SHA-256, HMAC, and SplitMix64 PRNG
 - Deterministic per-round permutation generation from 36 documented primitives
-- Static library (`libcube96`), CLI demo, throughput benchmark, and unit tests
+- Installable static library (`libcube96`), CLI demo, throughput benchmark, and
+  unit tests with CTest labels (`KAT`, `PERM`, `HKDF`, `CT`, `CLI`)
+
+### Why 96-bit?
+
+The cipher’s state maps neatly onto a 4×4×6 cube, which keeps the permutation
+catalogue manageable for research, teaching, and tooling demonstrations. The
+short block and key sizes are not meant to provide production-grade security.
+
+## Quick start (C++)
+
+```cpp
+#include <array>
+#include "cube96/cipher.hpp"
+
+int main() {
+  std::array<std::uint8_t, cube96::CubeCipher::KeyBytes> key{{
+      0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B}};
+  std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> block{{
+      0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17}};
+
+  cube96::CubeCipher cipher;  // Defaults to the fast path unless forced hardening.
+  cipher.setKey(key.data());
+
+  std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> out{};
+  cipher.encryptBlock(block.data(), out.data());
+
+  return static_cast<int>(out[0]);  // Prevent optimisation away.
+}
+```
 
 ## Building
 
-Cube96 uses CMake and has no external dependencies.
+Cube96 uses portable CMake and has no external dependencies.
 
 ```sh
-mkdir -p build
-cd build
-cmake ..
-cmake --build .
+cmake -S . -B build
+cmake --build build
 ```
 
-To explicitly select a layout mapping at configure time, pass
-`-DCUBE96_LAYOUT=zslice` (default) or `-DCUBE96_LAYOUT=rowmajor` to the CMake
-configure command. The chosen layout affects how `(x, y, z)` cube coordinates
-map to bytes/bits in memory.
+Useful configuration options:
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `-DCUBE96_LAYOUT={zslice,rowmajor}` | `zslice` | Selects the state bit layout. |
+| `-DCUBE96_FORCE_CONSTANT_TIME=ON` | `OFF` | Forces the hardened implementation and removes table lookups. |
+| `-DCUBE96_ENABLE_FAST_IMPL=OFF` | `ON` | (Implicitly set when forcing constant-time) disables the fast S-box tables. |
+
+Install the library and headers into a prefix:
+
+```sh
+cmake --install build --prefix /tmp/cube96-install
+```
+
+Consumers can then use the generated package configuration:
+
+```cmake
+find_package(cube96 CONFIG REQUIRED)
+add_executable(app main.cpp)
+target_link_libraries(app PRIVATE cube96::cube96)
+```
 
 ## Testing
 
-Unit tests are registered with CTest. After building, run:
+Unit tests are registered with CTest and carry labels for selective execution.
 
 ```sh
-ctest
+ctest --test-dir build --output-on-failure
+ctest --test-dir build -L KAT --output-on-failure  # only known-answer tests
 ```
 
 ## Command-line Interface
@@ -64,20 +111,28 @@ Every invocation prints a reminder that this is an experimental artifact:
 ./cube96_cli dec <hex-key-24> <hex-ciphertext-24>
 ```
 
-Example:
+Example round-trip using the first vector from `vectors/cube96_kats_zslice.csv`:
 
 ```sh
-./cube96_cli enc 000102030405060708090a0b 0c0d0e0f1011121314151617
+./cube96_cli enc 000000000000000000000000 000000000000000000000000
+# stderr: Research cipher warning
+# stdout: b6393ae0d2e9a2c771e619fa
+./cube96_cli dec 000000000000000000000000 b6393ae0d2e9a2c771e619fa
+# stdout: 000000000000000000000000
 ```
+
+Invalid keys or blocks (wrong length or non-hex characters) trigger exit code
+`65` with a descriptive error. An unknown mode returns `66`, and supplying the
+wrong number of arguments returns `64` after printing usage.
 
 ## Reference Test Vectors
 
-Deterministic known-answer tests (KATs) for the default `zslice` layout build
-are published under [`vectors/`](vectors/). Each CSV row lists the hexadecimal
-key, plaintext, and ciphertext for a single block encryption. Changing the
-layout at compile time (e.g. configuring CMake with
-`-DCUBE96_LAYOUT=rowmajor`) produces a different state mapping and therefore a
-different set of vectors.
+Deterministic known-answer tests (KATs) for both layouts are published under
+[`vectors/`](vectors/). Each CSV row lists the hexadecimal key, plaintext, and
+ciphertext for a single block encryption.
+
+- `cube96_kats_zslice.csv` – default layout (matches the CLI example above)
+- `cube96_kats_rowmajor.csv` – layout selected via `-DCUBE96_LAYOUT=rowmajor`
 
 For example, the all-zero key/plaintext vector encrypts to:
 
@@ -122,7 +177,24 @@ encrypting 64 MiB of random data in ECB mode. After building, run:
 ```
 
 Set the `CUBE96_BENCH_BYTES` environment variable to reduce the workload during
-CI runs or quick smoke tests (default is 64 MiB).
+CI runs or quick smoke tests (default is 64 MiB). The value must be a positive
+multiple of 12 bytes (one block); invalid overrides cause the benchmark to exit
+with a non-zero status.
+
+## Sanity run
+
+Copy/paste the following block for a quick verification of the default
+configuration, labelled test subsets, CLI behaviour, and the benchmark smoke
+test:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+ctest --test-dir build -L KAT --output-on-failure
+./build/cube96_cli enc 000000000000000000000000 000000000000000000000000
+CUBE96_BENCH_BYTES=120 ./build/cube96_bench
+```
 
 ## Analysis Helpers
 
