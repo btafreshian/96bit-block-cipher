@@ -1,6 +1,7 @@
 #include <array>
 #include <iostream>
 #include <random>
+#include <vector>
 
 #include "cube96/cipher.hpp"
 
@@ -8,14 +9,23 @@ int main() {
   std::mt19937_64 rng(0xC0FFEEu);
   std::uniform_int_distribution<int> dist(0, 255);
 
-  cube96::CubeCipher fast(cube96::CubeCipher::Impl::Fast);
-  cube96::CubeCipher hard(cube96::CubeCipher::Impl::Hardened);
+  std::vector<cube96::CubeCipher::Impl> implementations;
+  if (cube96::CubeCipher::hasFastImpl()) {
+    implementations.push_back(cube96::CubeCipher::Impl::Fast);
+  }
+  if (cube96::CubeCipher::hasHardenedImpl()) {
+    implementations.push_back(cube96::CubeCipher::Impl::Hardened);
+  }
+
+  if (implementations.empty()) {
+    std::cerr << "No implementations enabled\n";
+    return 1;
+  }
 
   std::array<std::uint8_t, cube96::CubeCipher::KeyBytes> key{};
   std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> plain{};
-  std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> cipher_fast{};
-  std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> cipher_hard{};
   std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> recovered{};
+  std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> baseline{};
 
   const std::size_t iterations = 50000;
   for (std::size_t iter = 0; iter < iterations; ++iter) {
@@ -26,26 +36,25 @@ int main() {
       b = static_cast<std::uint8_t>(dist(rng));
     }
 
-    fast.setKey(key.data());
-    hard.setKey(key.data());
-
-    fast.encryptBlock(plain.data(), cipher_fast.data());
-    fast.decryptBlock(cipher_fast.data(), recovered.data());
-    if (recovered != plain) {
-      std::cerr << "Fast roundtrip mismatch at iteration " << iter << "\n";
-      return 1;
-    }
-
-    hard.encryptBlock(plain.data(), cipher_hard.data());
-    if (cipher_hard != cipher_fast) {
-      std::cerr << "Implementation mismatch at iteration " << iter << "\n";
-      return 1;
-    }
-
-    hard.decryptBlock(cipher_fast.data(), recovered.data());
-    if (recovered != plain) {
-      std::cerr << "Hardened roundtrip mismatch at iteration " << iter << "\n";
-      return 1;
+    bool have_baseline = false;
+    for (auto impl : implementations) {
+      cube96::CubeCipher cipher(impl);
+      cipher.setKey(key.data());
+      std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> cipher_text{};
+      cipher.encryptBlock(plain.data(), cipher_text.data());
+      if (!have_baseline) {
+        baseline = cipher_text;
+        have_baseline = true;
+      } else if (cipher_text != baseline) {
+        std::cerr << "Implementation mismatch at iteration " << iter << "\n";
+        return 1;
+      }
+      cipher.decryptBlock(cipher_text.data(), recovered.data());
+      if (recovered != plain) {
+        std::cerr << "Roundtrip mismatch at iteration " << iter << " for impl "
+                  << static_cast<int>(impl) << "\n";
+        return 1;
+      }
     }
   }
 

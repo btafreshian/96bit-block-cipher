@@ -42,6 +42,26 @@ int main() {
         return 1;
       }
     }
+
+    std::array<std::uint8_t, cube96::kBlockBytes> state{};
+    state[r % state.size()] = static_cast<std::uint8_t>(r * 17u);
+    std::array<std::uint8_t, cube96::kBlockBytes> tmp{};
+    std::array<std::uint8_t, cube96::kBlockBytes> roundtrip{};
+
+    cube96::apply_permutation(perm, state.data(), tmp.data());
+    cube96::apply_permutation(inv, tmp.data(), roundtrip.data());
+    if (roundtrip != state) {
+      std::cerr << "Permutation round-trip failure at round " << r << "\n";
+      return 1;
+    }
+
+    cube96::apply_permutation_ct(perm, state.data(), tmp.data());
+    cube96::apply_permutation_ct(inv, tmp.data(), roundtrip.data());
+    if (roundtrip != state) {
+      std::cerr << "Constant-time permutation round-trip failure at round " << r
+                << "\n";
+      return 1;
+    }
   }
 
   std::cout << "test_permutation: OK\n";

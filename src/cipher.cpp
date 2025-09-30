@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <stdexcept>
 
 #include "cube96/impl_dispatch.hpp"
 #include "cube96/key_schedule.hpp"
@@ -19,7 +20,14 @@ namespace cube96 {
 // permutation helper so that both halves of the round adhere to the selected
 // side-channel trade-off.
 
-CubeCipher::CubeCipher(Impl impl) : impl_(impl) {}
+CubeCipher::CubeCipher(Impl impl) : impl_(impl) {
+#if defined(CUBE96_FORCE_CONSTANT_TIME) || defined(CUBE96_DISABLE_FAST_IMPL)
+  if (impl == Impl::Fast) {
+    throw std::invalid_argument("Fast implementation disabled at build time");
+  }
+  impl_ = Impl::Hardened;
+#endif
+}
 
 void CubeCipher::setKey(const std::uint8_t key[KeyBytes]) {
   DerivedMaterial material = derive_material(key);
@@ -51,14 +59,30 @@ void CubeCipher::encryptBlock(const std::uint8_t in[BlockBytes],
     for (std::size_t i = 0; i < BlockBytes; ++i) {
       state[i] ^= round_keys_[r][i];
     }
-    if (impl_ == Impl::Fast) {
+    if (
+#if !defined(CUBE96_DISABLE_FAST_IMPL)
+        impl_ == Impl::Fast
+#else
+        false
+#endif
+    ) {
+#if !defined(CUBE96_DISABLE_FAST_IMPL)
       sub_bytes_fast(state);
+#endif
     } else {
       sub_bytes_hardened(state);
     }
     std::uint8_t tmp[BlockBytes];
-    if (impl_ == Impl::Fast) {
+    if (
+#if !defined(CUBE96_DISABLE_FAST_IMPL)
+        impl_ == Impl::Fast
+#else
+        false
+#endif
+    ) {
+#if !defined(CUBE96_DISABLE_FAST_IMPL)
       apply_permutation(perm_[r], state, tmp);
+#endif
     } else {
       apply_permutation_ct(perm_[r], state, tmp);
     }
@@ -82,14 +106,30 @@ void CubeCipher::decryptBlock(const std::uint8_t in[BlockBytes],
 
   for (int r = static_cast<int>(kRoundCount) - 1; r >= 0; --r) {
     std::uint8_t tmp[BlockBytes];
-    if (impl_ == Impl::Fast) {
+    if (
+#if !defined(CUBE96_DISABLE_FAST_IMPL)
+        impl_ == Impl::Fast
+#else
+        false
+#endif
+    ) {
+#if !defined(CUBE96_DISABLE_FAST_IMPL)
       apply_permutation(inv_perm_[r], state, tmp);
+#endif
     } else {
       apply_permutation_ct(inv_perm_[r], state, tmp);
     }
     std::memcpy(state, tmp, BlockBytes);
-    if (impl_ == Impl::Fast) {
+    if (
+#if !defined(CUBE96_DISABLE_FAST_IMPL)
+        impl_ == Impl::Fast
+#else
+        false
+#endif
+    ) {
+#if !defined(CUBE96_DISABLE_FAST_IMPL)
       inv_sub_bytes_fast(state);
+#endif
     } else {
       inv_sub_bytes_hardened(state);
     }
