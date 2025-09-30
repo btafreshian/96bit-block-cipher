@@ -70,6 +70,41 @@ Example:
 ./cube96_cli enc 000102030405060708090a0b 0c0d0e0f1011121314151617
 ```
 
+## Reference Test Vectors
+
+Deterministic known-answer tests (KATs) for the default `zslice` layout build
+are published under [`vectors/`](vectors/). Each CSV row lists the hexadecimal
+key, plaintext, and ciphertext for a single block encryption. Changing the
+layout at compile time (e.g. configuring CMake with
+`-DCUBE96_LAYOUT=rowmajor`) produces a different state mapping and therefore a
+different set of vectors.
+
+For example, the all-zero key/plaintext vector encrypts to:
+
+```
+key        = 000000000000000000000000
+plaintext  = 000000000000000000000000
+ciphertext = b6393ae0d2e9a2c771e619fa
+```
+
+You can verify the CSV entry with the CLI:
+
+```sh
+./cube96_cli enc 000000000000000000000000 000000000000000000000000
+# prints b6393ae0d2e9a2c771e619fa
+```
+
+## Interoperability Notes
+
+- Cube96 uses fixed 96-bit keys and 96-bit blocks (12 bytes each). Inputs must
+  be encoded as exactly 24 hexadecimal characters.
+- Hexadecimal strings are interpreted big-endian: the first two characters map
+  to the first byte fed into the cipher, and so on. The CLI accepts both upper-
+  and lower-case hex digits and emits lower-case output.
+- Internal state bits are packed most-significant-bit first within each byte.
+  Selecting the optional `rowmajor` layout only affects the in-memory mapping,
+  not the interpretation of external hex inputs.
+
 Exit codes:
 
 - `0` – success

@@ -52,3 +52,51 @@ jobs:
 
       - name: Test
         run: ctest --test-dir "$BUILD_DIR" --output-on-failure --build-config ${{ matrix.build_type }}
+
+  rowmajor:
+    name: rowmajor ${{ matrix.compiler }} ${{ matrix.build_type }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc]
+        build_type: [Release]
+    env:
+      BUILD_DIR: build/${{ matrix.compiler }}-${{ matrix.build_type }}-rowmajor
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup compiler
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            echo "CC=gcc" >> "$GITHUB_ENV"
+            echo "CXX=g++" >> "$GITHUB_ENV"
+          else
+            echo "CC=clang" >> "$GITHUB_ENV"
+            echo "CXX=clang++" >> "$GITHUB_ENV"
+          fi
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-rowmajor-ccache-${{ hashFiles('CMakeLists.txt', 'src/**/*.cpp', 'include/**/*.hpp') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}-rowmajor-ccache-
+            ${{ runner.os }}-${{ matrix.compiler }}-
+
+      - name: Configure (rowmajor)
+        run: |
+          cmake -S . -B "$BUILD_DIR" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCUBE96_LAYOUT=rowmajor
+
+      - name: Build (rowmajor)
+        run: cmake --build "$BUILD_DIR" --config ${{ matrix.build_type }}
+
+      - name: Test (rowmajor labeled subsets)
+        run: >-
+          ctest --test-dir "$BUILD_DIR" --output-on-failure --build-config
+          ${{ matrix.build_type }} -L "KAT|PERM|HKDF"
