@@ -1,6 +1,6 @@
 # Cube96 Block Cipher
 
-[![CI](https://github.com/OWNER/96bit-block-cipher/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/96bit-block-cipher/actions/workflows/ci.yml)
+[![CI](https://github.com/96bit-block-cipher/96bit-block-cipher/actions/workflows/ci.yml/badge.svg)](https://github.com/96bit-block-cipher/96bit-block-cipher/actions/workflows/ci.yml)
 
 > ⚠️ **Research cipher — NOT FOR PRODUCTION.** The 96-bit parameters keep the
 > state space tractable for exploration and are not intended to meet modern
@@ -96,6 +96,10 @@ Unit tests are registered with CTest and carry labels for selective execution.
 ctest --test-dir build --output-on-failure
 ctest --test-dir build -L KAT --output-on-failure  # only known-answer tests
 ```
+
+The long-running `test_roundtrip` binary now defaults to 10,000 random
+round-trips to keep CI runs under the workflow timeout. Increase coverage
+locally by exporting `CUBE96_TEST_ITERATIONS=<count>` before invoking CTest.
 
 ## Command-line Interface
 
