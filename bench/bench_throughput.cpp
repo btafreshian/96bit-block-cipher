@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include <array>
 #include <chrono>
 #include <cstddef>
@@ -48,16 +50,27 @@ void run_bench(cube96::CubeCipher::Impl impl, std::size_t bytes) {
 } // namespace
 
 int main() {
+  std::cout <<
+      "Research cipher — NOT FOR PRODUCTION. Key size chosen for tractability, "
+      "not security." << '\n';
+
   std::size_t bytes = 64ull * 1024ull * 1024ull;
   if (const char *env = std::getenv("CUBE96_BENCH_BYTES")) {
     char *end = nullptr;
     std::uint64_t parsed = std::strtoull(env, &end, 0);
-    if (end != env && parsed >= cube96::CubeCipher::BlockBytes) {
+    if (end != env && *end == '\0' &&
+        parsed >= cube96::CubeCipher::BlockBytes) {
       bytes = static_cast<std::size_t>(parsed -
                                        (parsed % cube96::CubeCipher::BlockBytes));
       if (bytes == 0) {
         bytes = cube96::CubeCipher::BlockBytes;
       }
+    } else if (end == env || *end != '\0') {
+      std::cerr << "Ignoring invalid CUBE96_BENCH_BYTES value '" << env
+                << "' (must be an integer number of bytes)." << '\n';
+    } else {
+      std::cerr << "CUBE96_BENCH_BYTES must be at least "
+                << cube96::CubeCipher::BlockBytes << " bytes." << '\n';
     }
   }
   run_bench(cube96::CubeCipher::Impl::Fast, bytes);

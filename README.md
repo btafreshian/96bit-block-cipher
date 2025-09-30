@@ -55,6 +55,10 @@ ctest
 The CLI encrypts or decrypts a single 96-bit block encoded as 24 hexadecimal
 characters.
 
+Every invocation prints a reminder that this is an experimental artifact:
+
+> Research cipher — NOT FOR PRODUCTION. Key size chosen for tractability, not security.
+
 ```sh
 ./cube96_cli enc <hex-key-24> <hex-plaintext-24>
 ./cube96_cli dec <hex-key-24> <hex-ciphertext-24>
@@ -65,6 +69,13 @@ Example:
 ```sh
 ./cube96_cli enc 000102030405060708090a0b 0c0d0e0f1011121314151617
 ```
+
+Exit codes:
+
+- `0` – success
+- `64` – incorrect CLI usage (missing/extra arguments)
+- `65` – malformed key/plaintext/ciphertext hex input
+- `66` – unknown mode (expected `enc` or `dec`)
 
 ## Benchmark
 
