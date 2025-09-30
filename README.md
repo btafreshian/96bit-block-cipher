@@ -72,10 +72,11 @@ Example:
 ./cube96_cli enc 000102030405060708090a0b 0c0d0e0f1011121314151617
 ```
 
-For experimenting with stream-like usage, wrap Cube96 in CTR mode by combining a
+As an educational example, you can wrap Cube96 in CTR mode by combining a
 96-bit nonce with a monotonically increasing block counter. Never reuse a
-nonce+counter pair under the same key, and bound messages so the 32-bit counter
-does not wrap.
+nonce+counter pair under the same key, and keep messages short enough that the
+32-bit counter does not wrap. This construction is for experiments only and
+inherits the cipher's research-grade caveats.
 
 ## Why 96-bit?
 
