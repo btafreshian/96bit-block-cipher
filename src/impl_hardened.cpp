@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "cube96/impl_dispatch.hpp"
 
 #include "cube96/sbox.hpp"
@@ -5,6 +7,9 @@
 
 namespace cube96 {
 
+// The hardened variant evaluates the AES S-box with a bitsliced expression
+// that avoids secret-dependent memory access.  It trades additional logic for
+// constant-time behaviour across supported platforms.
 void sub_bytes_hardened(std::uint8_t state[kBlockBytes]) {
   for (std::size_t i = 0; i < kBlockBytes; ++i) {
     state[i] = aes_sbox_bitsliced(state[i]);
