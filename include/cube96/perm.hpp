@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include <array>
@@ -22,6 +24,8 @@ void apply_permutation(const Permutation &p, const std::uint8_t in[kBlockBytes],
 void apply_permutation_ct(const Permutation &p, const std::uint8_t in[kBlockBytes],
                           std::uint8_t out[kBlockBytes]);
 
+// Returns the curated primitive moves (rotations, row/column cycles, slice
+// shifts) that compose into the round permutations.
 const std::array<Permutation, 36> &primitive_set();
 
 } // namespace cube96

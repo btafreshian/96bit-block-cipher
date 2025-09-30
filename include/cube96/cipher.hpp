@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include <array>
@@ -14,6 +16,10 @@ public:
   static constexpr std::size_t KeyBytes   = kKeyBytes;
 
   enum class Impl { Fast, Hardened };
+
+  // Choose Impl::Fast for table-based S-boxes and Impl::Hardened for the
+  // bitsliced constant-time circuit.  Both options share the same key schedule
+  // and permutation derivation logic.
 
   explicit CubeCipher(Impl impl = Impl::Fast);
 

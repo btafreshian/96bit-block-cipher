@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "cube96/perm.hpp"
 
 #include <algorithm>
@@ -7,6 +9,11 @@
 #include "cube96/types.hpp"
 
 namespace cube96 {
+
+// Permutations are built from a curated basis of cube rotations and slice
+// shifts.  Key material seeds a SplitMix64 generator whose outputs select 12
+// primitive steps per round, and their composition produces the working
+// permutation together with the precomputed inverse.
 
 std::uint64_t SplitMix64::next() {
   // Reference algorithm from Steele et al., as required by the specification.

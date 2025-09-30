@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "cube96/cipher.hpp"
 
 #include <algorithm>
@@ -9,6 +11,13 @@
 #include "cube96/endian.hpp"
 
 namespace cube96 {
+
+// Round structure: the cipher performs kRoundCount iterations of key addition,
+// byte-wise SubBytes, and a permutation whose shape is derived from the key.
+// The caller selects between the fast table S-box and the bitsliced
+// constant-time path through the Impl enum, and the same choice governs the
+// permutation helper so that both halves of the round adhere to the selected
+// side-channel trade-off.
 
 CubeCipher::CubeCipher(Impl impl) : impl_(impl) {}
 
@@ -37,6 +46,8 @@ void CubeCipher::encryptBlock(const std::uint8_t in[BlockBytes],
   std::memcpy(state, in, BlockBytes);
 
   for (std::size_t r = 0; r < kRoundCount; ++r) {
+    // AddRoundKey → SubBytes → bit permutation.  The S-box executes prior to
+    // shuffling so diffusion spans the entire cube before the next key mix.
     for (std::size_t i = 0; i < BlockBytes; ++i) {
       state[i] ^= round_keys_[r][i];
     }
