@@ -1,5 +1,7 @@
 # Cube96 Block Cipher
 
+**Research cipher — NOT FOR PRODUCTION. Key size chosen for tractability, not security.**
+
 [![CI](https://github.com/OWNER/96bit-block-cipher/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/96bit-block-cipher/actions/workflows/ci.yml)
 
 Cube96 is a 96-bit block cipher implementation with both fast and constant-time
@@ -70,6 +72,53 @@ Example:
 ./cube96_cli enc 000102030405060708090a0b 0c0d0e0f1011121314151617
 ```
 
+For experimenting with stream-like usage, wrap Cube96 in CTR mode by combining a
+96-bit nonce with a monotonically increasing block counter. Never reuse a
+nonce+counter pair under the same key, and bound messages so the 32-bit counter
+does not wrap.
+
+## Why 96-bit?
+
+Cube96 was designed as a tractable target for differential and linear analysis
+exercises rather than a production-strength primitive. The compact state keeps
+brute-force and meet-in-the-middle explorations within reach for classroom and
+capture-the-flag scenarios while still showcasing modern design techniques.
+
+## Reference Test Vectors
+
+Deterministic known-answer tests (KATs) for the default `zslice` layout build
+are published under [`vectors/`](vectors/). Each CSV row lists the hexadecimal
+key, plaintext, and ciphertext for a single block encryption. Changing the
+layout at compile time (e.g. configuring CMake with
+`-DCUBE96_LAYOUT=rowmajor`) produces a different state mapping and therefore a
+different set of vectors.
+
+For example, the all-zero key/plaintext vector encrypts to:
+
+```
+key        = 000000000000000000000000
+plaintext  = 000000000000000000000000
+ciphertext = b6393ae0d2e9a2c771e619fa
+```
+
+You can verify the CSV entry with the CLI:
+
+```sh
+./cube96_cli enc 000000000000000000000000 000000000000000000000000
+# prints b6393ae0d2e9a2c771e619fa
+```
+
+## Interoperability Notes
+
+- Cube96 uses fixed 96-bit keys and 96-bit blocks (12 bytes each). Inputs must
+  be encoded as exactly 24 hexadecimal characters.
+- Hexadecimal strings are interpreted big-endian: the first two characters map
+  to the first byte fed into the cipher, and so on. The CLI accepts both upper-
+  and lower-case hex digits and emits lower-case output.
+- Internal state bits are packed most-significant-bit first within each byte.
+  Selecting the optional `rowmajor` layout only affects the in-memory mapping,
+  not the interpretation of external hex inputs.
+
 Exit codes:
 
 - `0` – success
@@ -87,7 +136,9 @@ encrypting 64 MiB of random data in ECB mode. After building, run:
 ```
 
 Set the `CUBE96_BENCH_BYTES` environment variable to reduce the workload during
-CI runs or quick smoke tests (default is 64 MiB).
+CI runs or quick smoke tests (default is 64 MiB). The benchmark uses ECB mode
+solely to measure raw throughput; it lacks semantic security and must not be
+applied to real-world data.
 
 ## Analysis Helpers
 
@@ -104,6 +155,9 @@ Lightweight tooling for exploratory cryptanalysis is provided under
 
 The scripts emit human-readable summaries and/or CSV outputs suitable for
 further inspection in spreadsheets or plotting tools.
+
+For a step-by-step walkthrough with sample outputs, see the
+[`docs/analysis_guide.md`](docs/analysis_guide.md) companion guide.
 
 ## Project Layout
 
