@@ -61,13 +61,22 @@ void apply_permutation_ct(const Permutation &p, const std::uint8_t in[kBlockByte
                           std::uint8_t out[kBlockBytes]) {
   std::uint8_t tmp[kBlockBytes] = {0};
   for (std::uint8_t src = 0; src < kPermSize; ++src) {
-    std::uint8_t byte_index = byte_index_of_bit(src);
-    std::uint8_t bit_pos = bit_offset_in_byte(src);
-    std::uint8_t bit = static_cast<std::uint8_t>((in[byte_index] >> bit_pos) & 1u);
-    std::uint8_t dst = p[src];
-    std::uint8_t dst_byte = byte_index_of_bit(dst);
-    std::uint8_t dst_pos = bit_offset_in_byte(dst);
-    ct_write_bit(tmp, dst_byte, dst_pos, bit);
+    const std::uint8_t byte_index = byte_index_of_bit(src);
+    const std::uint8_t bit_pos = bit_offset_in_byte(src);
+    const std::uint8_t bit = static_cast<std::uint8_t>((in[byte_index] >> bit_pos) & 1u);
+    const std::uint8_t dst = p[src];
+    const std::uint8_t dst_byte = byte_index_of_bit(dst);
+    const std::uint8_t dst_pos = bit_offset_in_byte(dst);
+    const std::uint8_t bit_mask = static_cast<std::uint8_t>(1u << dst_pos);
+    const std::uint8_t neg = ct_mask(bit);
+
+    for (std::uint8_t byte = 0; byte < kBlockBytes; ++byte) {
+      const std::uint8_t match_mask = ct_mask(ct_eq(dst_byte, byte));
+      const std::uint8_t preserved = tmp[byte];
+      const std::uint8_t cleared = static_cast<std::uint8_t>(preserved & static_cast<std::uint8_t>(~bit_mask));
+      const std::uint8_t updated = static_cast<std::uint8_t>(cleared | (neg & bit_mask));
+      tmp[byte] = ct_select(match_mask, updated, preserved);
+    }
   }
   std::memcpy(out, tmp, kBlockBytes);
 }
