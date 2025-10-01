@@ -1,7 +1,5 @@
 # Cube96 Block Cipher
 
-[![CI](https://github.com/96bit-block-cipher/96bit-block-cipher/actions/workflows/ci.yml/badge.svg)](https://github.com/96bit-block-cipher/96bit-block-cipher/actions/workflows/ci.yml)
-
 > ⚠️ **Research cipher — NOT FOR PRODUCTION.** The 96-bit parameters keep the
 > state space tractable for exploration and are not intended to meet modern
 > security targets. ECB mode usage is limited to performance measurement; any
