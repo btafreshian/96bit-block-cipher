@@ -204,9 +204,11 @@ void hkdf_expand(const std::uint8_t prk[32], const std::uint8_t *info,
   std::size_t generated = 0;
   std::uint8_t counter = 1;
 
+  HmacSha256Ctx base_ctx;
+  hmac_init(base_ctx, prk, 32);
+
   while (generated < out_len) {
-    HmacSha256Ctx ctx;
-    hmac_init(ctx, prk, 32);
+    HmacSha256Ctx ctx = base_ctx;
     if (prev_len > 0) {
       hmac_update(ctx, previous, prev_len);
     }
@@ -242,8 +244,13 @@ DerivedMaterial derive_material(const std::uint8_t key[kKeyBytes]) {
   std::uint8_t okm[172];
   hkdf_expand(prk, kInfo, sizeof(kInfo) - 1, okm, sizeof(okm));
 
+  static_assert(kRoundCount * kBlockBytes + kRoundCount * 8 + kBlockBytes == sizeof(okm),
+                "HKDF layout must match derived material footprint");
+
   DerivedMaterial material;
   std::size_t offset = 0;
+  // okm layout: round keys (kRoundCount × kBlockBytes), permutation seeds
+  // (kRoundCount × 8), and post-whitening block (kBlockBytes).
   for (std::size_t r = 0; r < kRoundCount; ++r) {
     std::copy_n(okm + offset, kBlockBytes, material.round_keys[r].begin());
     offset += kBlockBytes;

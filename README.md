@@ -9,7 +9,10 @@ Cube96 is a 96-bit block cipher implementation with both fast and constant-time
 execution paths. The design operates on a 4×4×6 logical cube of bits and pairs
 AES S-box substitution with key-dependent Rubik-style permutations derived from
 SplitMix64. Keys and permutations are deterministically produced with an
-HKDF(SHA-256) schedule.
+HKDF(SHA-256) schedule. Hardened mode swaps the table S-box for a bitsliced
+variant and keeps the permutation memory access pattern fixed across keys; it
+still shares the same algebraic structure and is not a proof of constant-time
+behaviour in the cryptographic sense.
 
 For technical details, round descriptions, and the full permutation catalogue
 refer to [`docs/spec.md`](docs/spec.md).
@@ -230,3 +233,22 @@ further inspection in spreadsheets or plotting tools.
 
 This project is available under the terms of the MIT License. See
 [`LICENSE`](LICENSE).
+### Selecting the hardened implementation
+
+Runtime callers can force the constant-time pathway regardless of build flags
+by instantiating the cipher with `Impl::Hardened`. The helpers
+`CubeCipher::hasFastImpl()` and `CubeCipher::DefaultImpl` expose the build
+policy so applications can adapt when the fast implementation is disabled.
+
+```cpp
+auto impl = cube96::CubeCipher::hasFastImpl()
+                ? cube96::CubeCipher::Impl::Hardened
+                : cube96::CubeCipher::DefaultImpl;
+cube96::CubeCipher hardened_cipher(impl);
+```
+
+`Impl::Hardened` removes lookup tables and uses a constant-memory permutation
+routine; it does not eliminate timing variation from unrelated platform
+effects, so consumers should still perform their own side-channel analysis when
+considering integration.
+
