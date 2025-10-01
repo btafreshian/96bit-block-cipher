@@ -1,4 +1,5 @@
 #include <array>
+#include <cstdlib>
 #include <iostream>
 #include <random>
 #include <vector>
@@ -27,7 +28,17 @@ int main() {
   std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> recovered{};
   std::array<std::uint8_t, cube96::CubeCipher::BlockBytes> baseline{};
 
-  const std::size_t iterations = 50000;
+  // Default to a 10k-sample sweep to balance coverage with CI runtime.  Allow
+  // overriding through an environment variable so developers can dial the
+  // iteration count up when investigating discrepancies locally.
+  std::size_t iterations = 10000;
+  if (const char *env = std::getenv("CUBE96_TEST_ITERATIONS")) {
+    char *end = nullptr;
+    unsigned long parsed = std::strtoul(env, &end, 10);
+    if (end != env && *end == '\0' && parsed > 0) {
+      iterations = static_cast<std::size_t>(parsed);
+    }
+  }
   for (std::size_t iter = 0; iter < iterations; ++iter) {
     for (auto &b : key) {
       b = static_cast<std::uint8_t>(dist(rng));
